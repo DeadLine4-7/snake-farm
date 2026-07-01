@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Змейка на Ферме — Охота Призраков</title>
+    <script src="https://yandex.ru/games/sdk/v2"></script>
     <style>
         body {
             background-color: #1e272e;
@@ -226,6 +227,16 @@
             cursor: pointer;
         }
         #gameExitBtn:hover { background: #922b21; }
+
+        /* ИСПРАВЛЕННЫЕ СТИЛИ ТОЧЕК ДЛЯ СКИНОВ СЛЕВА */
+        .skin-dot {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
@@ -281,27 +292,27 @@
             <div id="skinsShelf" class="shop-shelf">
                 <h3>Доступные Скины</h3>
                 <div class="shelf-item">
-                    <span>🟢 Лесная Змейка (Стандарт)</span>
+                    <span><span class="skin-dot" style="background-color: #2ecc71; border: 1px solid #1a1a1a;"></span> Лесная Змейка (Стандарт)</span>
                     <button class="buy-btn" id="skin_green_btn" onclick="selectSkin('green')">Выбрать</button>
                 </div>
                 <div class="shelf-item">
-                    <span>🔵 Синяя (Зелёные точки)</span>
+                    <span><span class="skin-dot" style="background-color: #2980b9; border: 1px solid #1a1a1a;"></span> Синяя (Зелёные точки)</span>
                     <button class="buy-btn" id="skin_blue_btn" onclick="buySkin('blue', 40)">40 🍎</button>
                 </div>
                 <div class="shelf-item">
-                    <span>🔴 Красная (Оранжевые точки)</span>
+                    <span><span class="skin-dot" style="background-color: #c0392b; border: 1px solid #1a1a1a;"></span> Красная (Оранжевые точки)</span>
                     <button class="buy-btn" id="skin_red_btn" onclick="buySkin('red', 40)">40 🍎</button>
                 </div>
                 <div class="shelf-item">
-                    <span>⚪ Белая (Пепельные точки)</span>
+                    <span><span class="skin-dot" style="background-color: #ffffff; border: 1px solid #7f8c8d;"></span> Белая (Белые точки)</span>
                     <button class="buy-btn" id="skin_white_btn" onclick="buySkin('white', 40)">40 🍎</button>
                 </div>
                 <div class="shelf-item">
-                    <span>⚫ Чёрная (Белые точки)</span>
+                    <span><span class="skin-dot" style="background-color: #2c3e50; border: 1px solid #1a1a1a;"></span> Чёрная (Пепельные точки)</span>
                     <button class="buy-btn" id="skin_black_btn" onclick="buySkin('black', 40)">40 🍎</button>
                 </div>
                 <div class="shelf-item">
-                    <span>👑 Королевская Золотая</span>
+                    <span><span class="skin-dot" style="background-color: #f1c40f; border: 1px solid #1a1a1a;"></span> Королевская Золотая</span>
                     <button class="buy-btn" id="skin_gold_btn" onclick="buySkin('gold', 60)">60 🍎</button>
                 </div>
                 <button class="buy-btn" style="background:#95a5a6; margin-top:10px;" onclick="closeShelf()">Назад к амбарам</button>
@@ -317,6 +328,24 @@
     let totalCoins = 0;
     let speedLevel = 0; 
     let livesLevel = 0; 
+
+    // СТАБИЛЬНЫЕ 60 FPS ДЛЯ ЛЮБЫХ ЭКРАНОВ
+    let lastFpsTime = 0;
+    const fpsInterval = 1000 / 60; 
+
+    // Инициализация SDK Яндекса
+    let ysdk = null;
+    function initYandexSDK() {
+        if (typeof YaGames !== 'undefined') {
+            YaGames.init().then(_sdk => {
+                console.log('Yandex SDK успешно инициализирован');
+                ysdk = _sdk;
+            }).catch(err => {
+                console.error('Ошибка инициализации SDK:', err);
+            });
+        }
+    }
+    window.addEventListener('DOMContentLoaded', initYandexSDK);
 
     // База данных купленных скинов
     let ownedSkins = {
@@ -339,7 +368,8 @@
 
         let player = {
             x: 375, y: 275, size: 25,
-            speed: 3, lives: 1, direction: 'right',
+            speed: 3, 
+            lives: 1, direction: 'right',
             tail: [], tailLength: 4, invulnerableFrames: 0
         };
 
@@ -349,6 +379,7 @@
         let isGameOver = false;
         let isGameStarted = false;
         let countdown = null;
+        let animationFrameId = null;
         
         let enemies = [];
         let fences = [];
@@ -402,10 +433,11 @@
             }
         }
 
+        // ПРОСТЫЕ БОТЫ (Оставлена легкая логика движения)
         function generateEasyEnemies() {
             enemies = [];
-            enemies.push({ x: 40, y: 100, size: 24, color: "#e74c3c", stuckFrames: 0, panicTicks: 0 });
-            enemies.push({ x: 730, y: 520, size: 24, color: "#fd79a8", stuckFrames: 0, panicTicks: 0 });
+            enemies.push({ x: 50, y: 100, size: 24, color: "#e74c3c", stuckFrames: 0, panicTicks: 0 });
+            enemies.push({ x: 725, y: 525, size: 24, color: "#fd79a8", stuckFrames: 0, panicTicks: 0 });
         }
 
         function startGame() {
@@ -418,7 +450,6 @@
             score = 0;
             timeLeft = 60;
 
-            player.speed = 3 * Math.pow(1.25, speedLevel);
             player.lives = 1 + livesLevel;
             
             player.x = 375;
@@ -431,8 +462,8 @@
             generateComplexFences();
             generateEasyEnemies();
 
-            for (let i = 0; i < 40; i++) {
-                player.tail.push({ x: player.x - i, y: player.y });
+            for (let i = 0; i < player.tailLength; i++) {
+                player.tail.push({ x: player.x - (i * player.size), y: player.y });
             }
 
             spawnFood();
@@ -447,13 +478,16 @@
                 }
             }, 1000);
 
-            gameLoop();
+            lastFpsTime = performance.now();
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(gameLoop);
         }
 
         function quitToMenu() {
             isGameStarted = false;
             isGameOver = false;
             if (countdown) clearInterval(countdown);
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
             totalCoins += score;
             score = 0;
             exitBtn.style.display = "none";
@@ -480,17 +514,17 @@
             let key = event.key.toLowerCase();
             let code = event.code;
 
-            if (event.key === "ArrowLeft" || code === "KeyA" || key === "a" || key === "ф") {
-                if (player.direction !== 'right') player.direction = 'left';
+            if ((event.key === "ArrowLeft" || code === "KeyA" || key === "a" || key === "ф") && player.direction !== 'right') {
+                player.direction = 'left';
             }
-            if (event.key === "ArrowRight" || code === "KeyD" || key === "d" || key === "в") {
-                if (player.direction !== 'left') player.direction = 'right';
+            else if ((event.key === "ArrowRight" || code === "KeyD" || key === "d" || key === "в") && player.direction !== 'left') {
+                player.direction = 'right';
             }
-            if (event.key === "ArrowUp" || code === "KeyW" || key === "w" || key === "ц") {
-                if (player.direction !== 'down') player.direction = 'up';
+            else if ((event.key === "ArrowUp" || code === "KeyW" || key === "w" || key === "ц") && player.direction !== 'down') {
+                player.direction = 'up';
             }
-            if (event.key === "ArrowDown" || code === "KeyS" || key === "s" || key === "ы") {
-                if (player.direction !== 'up') player.direction = 'down';
+            else if ((event.key === "ArrowDown" || code === "KeyS" || key === "s" || key === "ы") && player.direction !== 'up') {
+                player.direction = 'down';
             }
             
             if (isGameOver) {
@@ -519,8 +553,16 @@
             }
         }
 
-        function gameLoop() {
+        function gameLoop(currentTime) {
             if (!isGameStarted) return;
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+
+            let elapsed = currentTime - lastFpsTime;
+
+            if (elapsed < fpsInterval) return;
+
+            lastFpsTime = currentTime - (elapsed % fpsInterval);
 
             if (isGameOver) {
                 ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
@@ -538,18 +580,16 @@
                 return;
             }
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawGrass();
-
             if (player.invulnerableFrames > 0) player.invulnerableFrames--;
 
+            let currentSpeed = player.speed * Math.pow(1.25, speedLevel);
             let oldX = player.x;
             let oldY = player.y;
 
-            if (player.direction === 'right') player.x += player.speed;
-            if (player.direction === 'left')  player.x -= player.speed;
-            if (player.direction === 'up')    player.y -= player.speed;
-            if (player.direction === 'down')  player.y += player.speed;
+            if (player.direction === 'right') player.x += currentSpeed;
+            if (player.direction === 'left')  player.x -= currentSpeed;
+            if (player.direction === 'up')    player.y -= currentSpeed;
+            if (player.direction === 'down')  player.y += currentSpeed;
 
             if (player.x < 0) player.x = 0;
             if (player.x + player.size > canvas.width) player.x = canvas.width - player.size;
@@ -562,27 +602,25 @@
                 if (player.invulnerableFrames === 0) {
                     player.lives--;
                     if (player.lives <= 0) { isGameOver = true; totalCoins += score; }
-                    else { player.invulnerableFrames = 60; }
+                    else { player.invulnerableFrames = 30; }
                 }
             }
 
             player.tail.unshift({ x: player.x, y: player.y });
-            let step = Math.max(1, Math.round(24 / player.speed));
-            if (player.tail.length > player.tailLength * step) {
+            if (player.tail.length > player.tailLength * (25 / currentSpeed)) {
                 player.tail.pop();
             }
 
-            let enemySpeed = player.speed * 0.45; 
+            // МЕДЛЕННЫЕ И ПРОСТЫЕ БОТЫ (Сбалансированная скорость 1.5)
+            let enemySpeed = 1.5; 
             for (let enemy of enemies) {
                 let eOldX = enemy.x;
                 let eOldY = enemy.y;
-
-                let moveX = 0;
-                let moveY = 0;
+                let moveX = 0, moveY = 0;
 
                 if (enemy.panicTicks > 0) {
                     enemy.panicTicks--;
-                    if (enemy.panicTicks % 8 === 0) {
+                    if (enemy.panicTicks % 20 === 0) {
                         enemy.randDir = Math.floor(Math.random() * 4);
                     }
                     if (enemy.randDir === 0) moveX = enemySpeed;
@@ -607,33 +645,25 @@
                     if (moveX !== 0) {
                         let upY = enemy.y - enemySpeed;
                         let downY = enemy.y + enemySpeed;
-                        if (!checkWallCollision(enemy.x, upY, enemy.size) && player.y < enemy.y) {
-                            enemy.y = upY;
-                        } else if (!checkWallCollision(enemy.x, downY, enemy.size)) {
-                            enemy.y = downY;
-                        }
+                        if (!checkWallCollision(enemy.x, upY, enemy.size) && player.y < enemy.y) enemy.y = upY;
+                        else if (!checkWallCollision(enemy.x, downY, enemy.size)) enemy.y = downY;
                     } 
                     else if (moveY !== 0) {
                         let leftX = enemy.x - enemySpeed;
                         let rightX = enemy.x + enemySpeed;
-                        if (!checkWallCollision(leftX, enemy.y, enemy.size) && player.x < enemy.x) {
-                            enemy.x = leftX;
-                        } else if (!checkWallCollision(rightX, enemy.y, enemy.size)) {
-                            enemy.x = rightX;
-                        }
+                        if (!checkWallCollision(leftX, enemy.y, enemy.size) && player.x < enemy.x) enemy.x = leftX;
+                        else if (!checkWallCollision(rightX, enemy.y, enemy.size)) enemy.x = rightX;
                     }
 
                     if (enemy.x === eOldX && enemy.y === eOldY) {
                         enemy.stuckFrames++;
-                        if (enemy.stuckFrames > 12) {
-                            enemy.panicTicks = 30;    
+                        if (enemy.stuckFrames > 20) {
+                            enemy.panicTicks = 40;    
                             enemy.stuckFrames = 0;
                         }
                     }
                 } else {
-                    if (enemy.x !== eOldX || enemy.y !== eOldY) {
-                        enemy.stuckFrames = 0;
-                    }
+                    if (enemy.x !== eOldX || enemy.y !== eOldY) enemy.stuckFrames = 0;
                 }
 
                 if (player.x < enemy.x + enemy.size && player.x + player.size > enemy.x &&
@@ -641,7 +671,7 @@
                     if (player.invulnerableFrames === 0) {
                         player.lives--;
                         if (player.lives <= 0) { isGameOver = true; totalCoins += score; }
-                        else { player.invulnerableFrames = 60; }
+                        else { player.invulnerableFrames = 45; }
                     }
                 }
             }
@@ -649,11 +679,13 @@
             if (player.x < food.x + food.size && player.x + player.size > food.x &&
                 player.y < food.y + food.size && player.y + food.size > food.y) {
                 score++;
-                player.tailLength++;
+                player.tailLength += 2;
                 spawnFood();
             }
 
-            // РЕНДЕР ЗАБОРОВ
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrass();
+
             for (let fence of fences) {
                 ctx.fillStyle = "#8a4f2a";
                 ctx.fillRect(fence.x, fence.y, fence.size, fence.size);
@@ -662,14 +694,12 @@
                 ctx.fillRect(fence.x + fence.size - 3, fence.y, 3, fence.size);
             }
 
-            // РЕНДЕР ЯБЛОКА
             ctx.fillStyle = "#e74c3c";
             ctx.beginPath();
             ctx.arc(food.x + food.size/2, food.y + food.size/2, food.size/2, 0, Math.PI * 2);
             ctx.fill();
 
-            // РЕНДЕР КАСТОМНЫХ СКИНОВ ЗМЕЙКИ
-            if (player.invulnerableFrames === 0 || Math.floor(player.invulnerableFrames / 4) % 2 === 0) {
+            if (player.invulnerableFrames === 0 || Math.floor(player.invulnerableFrames / 3) % 2 === 0) {
                 let tailColor = "#196f3d";
                 let headColor = "#114624";
                 let dotColor = "#f1c40f";
@@ -686,26 +716,21 @@
                     tailColor = "#2c3e50"; headColor = "#1a252f"; dotColor = "#ffffff";
                 }
                 
-                // Хвост
-                for (let i = 1; i < player.tailLength; i++) {
-                    let idx = i * step;
-                    if (idx < player.tail.length) {
-                        let seg = player.tail[idx];
+                let spacing = Math.round(25 / currentSpeed);
+                for (let i = 1; i < player.tail.length; i++) {
+                    if (i % spacing === 0) {
+                        let seg = player.tail[i];
                         ctx.fillStyle = tailColor;
                         ctx.fillRect(seg.x, seg.y, player.size, player.size);
                         
-                        // Точка на спине
                         ctx.fillStyle = dotColor;
                         ctx.fillRect(seg.x + player.size/2 - 2, seg.y + player.size/2 - 2, 4, 4);
                     }
                 }
                 
-                // --- ДЕТАЛИЗИРОВАННАЯ ГОЛОВА ---
                 ctx.save();
-                
-                // 1. Рисуем закругленную форму головы в зависимости от направления
                 ctx.fillStyle = headColor;
-                let r = 8; // радиус закругления мордочки
+                let r = 8; 
                 let x = player.x, y = player.y, s = player.size;
                 
                 ctx.beginPath();
@@ -733,9 +758,8 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // 2. Динамические глаза (смотрят по направлению движения)
                 let eye1X, eye1Y, eye2X, eye2Y;
-                let lookX = 0, lookY = 0; // смещение зрачков
+                let lookX = 0, lookY = 0;
 
                 if (player.direction === 'right') {
                     eye1X = x + s - 9; eye1Y = y + 5;
@@ -755,22 +779,14 @@
                     lookY = 1;
                 }
 
-                // Отрисовка глаз (белки)
                 ctx.fillStyle = "#ffffff";
                 ctx.fillRect(eye1X, eye1Y, 5, 5);
                 ctx.fillRect(eye2X, eye2Y, 5, 5);
 
-                // Отрисовка зрачков со смещением
                 ctx.fillStyle = "#000000";
                 ctx.fillRect(eye1X + 1 + lookX, eye1Y + 1 + lookY, 3, 3);
                 ctx.fillRect(eye2X + 1 + lookX, eye2Y + 1 + lookY, 3, 3);
-                
-                // Маленькие блики в глазах (для живости)
-                ctx.fillStyle = "#ffffff";
-                ctx.fillRect(eye1X + 1 + lookX, eye1Y + 1 + lookY, 1, 1);
-                ctx.fillRect(eye2X + 1 + lookX, eye2Y + 1 + lookY, 1, 1);
 
-                // 3. Анимированный язык (высовывается случайно)
                 if (Math.sin(Date.now() / 80) > 0.4) {
                     ctx.strokeStyle = "#e74c3c";
                     ctx.lineWidth = 2;
@@ -794,11 +810,9 @@
                     }
                     ctx.stroke();
                 }
-
                 ctx.restore();
             }
 
-            // РЕНДЕР ПРИЗРАКОВ
             for (let enemy of enemies) {
                 ctx.fillStyle = enemy.color;
                 ctx.beginPath();
@@ -814,7 +828,6 @@
                 ctx.fillRect(enemy.x + 13, enemy.y + 3, 5, 5);
             }
 
-            // HUD ПАНЕЛЬ СВЕРХУ
             ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
             ctx.fillRect(0, 0, canvas.width, 60);
 
@@ -832,8 +845,6 @@
             let hearts = "";
             for (let h = 0; h < player.lives; h++) hearts += "❤️ ";
             ctx.fillText(hearts, canvas.width / 2 + 55, 38);
-
-            requestAnimationFrame(gameLoop);
         }
 
         drawGrass();
@@ -854,7 +865,6 @@
         document.getElementById("barnsRoot").style.display = "flex";
     }
 
-    // РАСЧЁТ ДИНАМИЧЕСКОЙ ЦЕНЫ УЛУЧШЕНИЙ (30 + 5 за уровень)
     function getUpgradePrice(currentLevel) {
         return 30 + (currentLevel * 5);
     }
@@ -862,7 +872,6 @@
     function updateShopUI() {
         document.getElementById("shopWallet").innerText = "🍎 Твои Яблоки: " + totalCoins;
         
-        // Обновление полки улучшений Жизней
         let livesCells = document.getElementById("livesBar").children;
         for (let i = 0; i < 4; i++) {
             if (i < livesLevel) livesCells[i].classList.add("fill");
@@ -878,7 +887,6 @@
             buyLiveBtn.innerText = currentLivesPrice + " 🍎";
         }
 
-        // Обновление полки улучшений Скорости
         let speedCells = document.getElementById("speedBar").children;
         for (let i = 0; i < 4; i++) {
             if (i < speedLevel) speedCells[i].classList.add("fill");
@@ -894,7 +902,6 @@
             buySpeedBtn.innerText = currentSpeedPrice + " 🍎";
         }
 
-        // Обновление кнопок всех скинов
         let skinIds = ['green', 'blue', 'red', 'white', 'black', 'gold'];
         skinIds.forEach(id => {
             let btn = document.getElementById("skin_" + id + "_btn");
@@ -902,14 +909,17 @@
 
             if (currentSkin === id) {
                 btn.innerText = "Активен";
-                btn.style.background = "#2ecc71";
+                btn.style.background = "#2ecc71"; 
+                btn.style.color = "white";
             } else if (ownedSkins[id]) {
                 btn.innerText = "Выбрать";
-                btn.style.background = "#3498db";
+                btn.style.background = "#3498db"; 
+                btn.style.color = "white";
             } else {
                 let p = (id === 'gold') ? 60 : 40;
                 btn.innerText = p + " 🍎";
-                btn.style.background = "#f1c40f";
+                btn.style.background = "#f1c40f"; 
+                btn.style.color = "#1e272e";
             }
         });
     }
@@ -931,7 +941,6 @@
         updateShopUI();
     }
 
-    // ПОКУПКА / ВЫБОР СКИНОВ
     function buySkin(id, price) {
         if (ownedSkins[id]) {
             currentSkin = id;
